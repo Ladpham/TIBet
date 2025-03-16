@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
         div.style.marginBottom = "10px";
 
         const label = document.createElement("label");
-        label.textContent = matchObj.label + " Vainqueur: ";
+        label.textContent = matchObj.label + " I Vainqueur: ";
 
         const select = document.createElement("select");
         select.name = matchObj.label; // so we know which match it belongs to
@@ -166,11 +166,12 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // If you want to write back to your sheet
-    fetch(appsScriptUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })
+      fetch(appsScriptUrl, {
+        method: "POST",
+        mode: "no-cors", // bypasses CORS check
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
       .then(res => res.json())
       .then(data => {
         console.log("Apps Script response:", data);
