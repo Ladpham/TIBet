@@ -8,68 +8,95 @@ document.addEventListener("DOMContentLoaded", () => {
   // REPLACE with your Apps Script Web App URL
   const appsScriptUrl = "https://script.google.com/macros/s/AKfycbzeyYo787WRHcCSjRw0BqWqfa_9pCAhj_0sSyjJvboNDEoOSfAwamyVyggljXVzAnSP5w/exec";
 
-  // We'll store match data here:
-  // matches = [
-  //   { label: "Match 1: Samuel vs Briac", possibleWinners: ["Samuel", "Briac"] },
-  //   { label: "Match 2: Hugo vs Jason",   possibleWinners: ["Hugo", "Jason"] },
+  // We'll store all match info here
+  // Example shape: 
+  // [
+  //   { label: "Match 1: Samuel vs Briac", possibleWinners: ["Samuel","Briac"] },
+  //   { label: "Match 2: Hugo vs Jason",   possibleWinners: ["Hugo","Jason"] },
   //   ...
   // ]
   let matches = [];
 
-  // 1. Fetch CSV data from your Sheet
   fetch(csvUrl)
     .then(response => response.text())
     .then(csvData => {
+      // Split into rows
       const lines = csvData.split("\n").map(line => line.split(","));
-      // lines[i][0] => Column A (Dropdown players)
-      // lines[i][1] => Column B (Match label)
-      // lines[i][4] => Column E (Possible winner)
+      // lines[i][0] => Column A (player)
+      // lines[i][1] => Column B (match label: "Match 1: X vs Y")
+      // lines[i][4] => Column E (optional: "X,Y")
 
-      // We'll gather:
-      //   all distinct players from col A -> player dropdown
-      //   match label from col B -> dynamic match objects
-      //   possible winner from col E -> add to match's possibleWinners
-
-      // Use a Set to track distinct players from Column A
+      // We'll keep track of unique players in a Set
       const playerSet = new Set();
-
-      // Use a map for matches: key = matchLabel, value = array of possible winners
+      // For matches, we'll use an object map for convenience
       const matchMap = {};
 
-      // Skip the header row if you have one
+      // If your sheet has a header row, detect and skip it
       let startIndex = 0;
-      if (lines[0][0].toLowerCase().includes("dropdown") 
-          || lines[0][1].toLowerCase().includes("match")) {
-        startIndex = 1; // skip the header
+      if (
+        lines[0][0] &&
+        lines[0][0].toLowerCase().includes("dropdown") || 
+        (lines[0][1] && lines[0][1].toLowerCase().includes("match"))
+      ) {
+        startIndex = 1;
       }
 
       for (let i = startIndex; i < lines.length; i++) {
         const row = lines[i];
-        if (!row || row.length < 5) continue; // skip blank/incomplete rows
+        if (!row || row.length < 2) continue; // skip empty/incomplete lines
 
-        const playerName = row[0].trim();
-        const matchLabel = row[1].trim();  // e.g. "Match 1: Samuel vs Briac"
-        const possibleWinner = row[4].trim();
-
-        // Collect players
+        // Column A: "Dropdown players"
+        const playerName = row[0]?.trim();
         if (playerName) {
           playerSet.add(playerName);
         }
 
-        // If Column B has "Match X: ..." we treat it as a match
-        if (matchLabel && matchLabel.toLowerCase().startsWith("match")) {
-          // Ensure we have a key for this match
-          if (!matchMap[matchLabel]) {
-            matchMap[matchLabel] = [];
-          }
-          // Add possible winner if non-empty
-          if (possibleWinner) {
-            matchMap[matchLabel].push(possibleWinner);
+        // Column B: "Match X: Name1 vs Name2"
+        const matchLabel = row[1]?.trim();
+        if (!matchLabel || !matchLabel.toLowerCase().startsWith("match")) {
+          // Not a match row, skip
+          continue;
+        }
+
+        // We'll figure out the possible winners in one of two ways:
+        // A) Parse from Column B
+        // B) Read from Column E
+
+        // --- Approach A: parse from Column B (if Column E is empty) ---
+        // e.g. "Match 1: Samuel vs Briac" => possibleWinners = ["Samuel","Briac"]
+        let possibleWinners = [];
+        // Quick parse if we see " vs ":
+        const colonIndex = matchLabel.indexOf(":");
+        if (colonIndex !== -1) {
+          // e.g. "Samuel vs Briac"
+          const afterColon = matchLabel.substring(colonIndex + 1).trim();
+          // split by " vs "
+          const parts = afterColon.split(" vs ");
+          if (parts.length === 2) {
+            possibleWinners = parts.map(p => p.trim());
           }
         }
+
+        // --- Approach B: read from Column E if it exists ---
+        // If your sheet truly stores possible winners in col E (row[4]):
+        if (row.length >= 5) {
+          const colE = row[4]?.trim(); // e.g. "Samuel,Briac"
+          if (colE) {
+            // If you want to override the parse approach with column E data:
+            possibleWinners = colE.split(",").map(p => p.trim());
+          }
+        }
+
+        // Store them in the map
+        if (!matchMap[matchLabel]) {
+          matchMap[matchLabel] = new Set();
+        }
+        possibleWinners.forEach(name => {
+          if (name) matchMap[matchLabel].add(name);
+        });
       }
 
-      // Fill the "Who are you?" dropdown
+      // Fill "Who are you?" dropdown from playerSet
       playerSet.forEach(player => {
         const option = document.createElement("option");
         option.value = player;
@@ -77,35 +104,35 @@ document.addEventListener("DOMContentLoaded", () => {
         playerDropdown.appendChild(option);
       });
 
-      // Build the matches array from matchMap
+      // Build final matches array from matchMap
       matches = Object.keys(matchMap).map(label => {
         return {
           label,
-          possibleWinners: matchMap[label]
+          possibleWinners: Array.from(matchMap[label]) // convert from Set to Array
         };
       });
 
-      // Sort by match number if desired (optional)
+      // Sort matches by match number (optional)
       matches.sort((a, b) => {
-        // e.g. "Match 1:" vs "Match 2:"
+        // e.g. "Match 1: ..." => extract "1", "2", ...
         const aNum = parseInt(a.label.replace(/\D+/g, "")) || 0;
         const bNum = parseInt(b.label.replace(/\D+/g, "")) || 0;
         return aNum - bNum;
       });
 
-      // Dynamically create a dropdown for each match
-      matches.forEach(match => {
+      // Dynamically build the match dropdowns
+      matches.forEach(matchObj => {
         const div = document.createElement("div");
         div.style.marginBottom = "10px";
 
         const label = document.createElement("label");
-        label.textContent = match.label + " Vainqueur: ";
+        label.textContent = matchObj.label + " Vainqueur: ";
 
         const select = document.createElement("select");
-        select.name = match.label; // so we know which match this belongs to
+        select.name = matchObj.label; // so we know which match it belongs to
 
-        // Add each possible winner as an <option>
-        match.possibleWinners.forEach(pw => {
+        // Add each possible winner
+        matchObj.possibleWinners.forEach(pw => {
           const opt = document.createElement("option");
           opt.value = pw;
           opt.textContent = pw;
@@ -117,47 +144,45 @@ document.addEventListener("DOMContentLoaded", () => {
         matchesContainer.appendChild(div);
       });
     })
-    .catch(err => console.error("Error fetching or parsing CSV:", err));
+    .catch(err => {
+      console.error("Error fetching or parsing CSV:", err);
+    });
 
-  // 2. On submit, gather picks & POST to Apps Script
+  // When user clicks Submit, gather picks and send to Apps Script
   submitBtn.addEventListener("click", () => {
     const user = playerDropdown.value;
     const picks = {};
 
-    // For each <select> inside matchesContainer, store the user’s choice
+    // For each match dropdown
     const selects = matchesContainer.querySelectorAll("select");
     selects.forEach(sel => {
-      picks[sel.name] = sel.value; 
-      // sel.name is something like "Match 1: Samuel vs Briac"
-      // sel.value is whichever possible winner they picked
+      picks[sel.name] = sel.value;
     });
 
-    // Build our payload
+    // Build payload
     const payload = {
       user,
       picks
     };
 
-    // POST to Apps Script
+    // If you want to write back to your sheet
     fetch(appsScriptUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      // If you get CORS issues, you can try mode: "no-cors",
-      // but then you won't see the response
+      body: JSON.stringify(payload)
     })
-      .then(response => response.json())
+      .then(res => res.json())
       .then(data => {
         console.log("Apps Script response:", data);
         if (data.status === "success") {
           alert("Your picks have been submitted!");
         } else {
-          alert("Error submitting picks: " + JSON.stringify(data));
+          alert("Error: " + JSON.stringify(data));
         }
       })
       .catch(err => {
-        console.error("Fetch error:", err);
-        alert("Could not submit your picks.");
+        console.error("Error submitting picks:", err);
+        alert("Error submitting picks.");
       });
   });
 });
