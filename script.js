@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitBtn = document.getElementById("submitBtn");
 
   // REPLACE with your CSV link from Google Sheets
-  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXb4p6uA6bu7bwUwGq9wqynZkz0UzxKAtr7Cr4XVvuoVPyT1pb3Qqhq8lTCb4rv3sKuJQVnaJr9NI8/pubhtml?gid=2049025787&single=true&output=csv";
+  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXb4p6uA6bu7bwUwGq9wqynZkz0UzxKAtr7Cr4XVvuoVPyT1pb3Qqhq8lTCb4rv3sKuJQVnaJr9NI8/pub?gid=2049025787&single=true&output=csv";
   // REPLACE with your Apps Script Web App URL
   const appsScriptUrl = "https://script.google.com/macros/s/AKfycbzeyYo787WRHcCSjRw0BqWqfa_9pCAhj_0sSyjJvboNDEoOSfAwamyVyggljXVzAnSP5w/exec";
 
