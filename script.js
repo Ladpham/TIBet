@@ -168,18 +168,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // If you want to write back to your sheet
       fetch(appsScriptUrl, {
         method: "POST",
-        mode: "no-cors", // bypasses CORS check
+        mode: "no-cors", // bypass CORS restrictions; response will be opaque
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       })
-      .then(res => res.json())
-      .then(data => {
-        console.log("Apps Script response:", data);
-        if (data.status === "success") {
-          alert("Your picks have been submitted!");
-        } else {
-          alert("Error: " + JSON.stringify(data));
-        }
+      .then(() => {
+        // We assume success because the response is opaque.
+        alert("Your picks have been submitted!");
       })
       .catch(err => {
         console.error("Error submitting picks:", err);
